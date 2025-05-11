@@ -22,8 +22,8 @@ app.post('/webhook', async (req, res) => {
     const userId = source.userId;
     const userMessage = message.text.trim();
 
-    // ✅ 幫助功能
-    if (userMessage === '/幫助') {
+    // ✅ 幫助功能// ✅ 幫助功能
+    if (userMessage === '/幫助') {if (userMessage === '/幫助') {
       await replyToLine(replyToken, `
 📖 指令說明：
 👉 記錄假期：@LSC排班助理 小明 6/3, 6/7 休假
@@ -124,10 +124,17 @@ app.post('/webhook', async (req, res) => {
     const result = await updateVacation(groupId, monthText, name, userId, dates);
     if (result === 'same') return;
 
-    const msg = result === 'updated'
-      ? `✅ @${name} 的假期已更新為：${dates}`
-      : `✅ 已為 @${name} 記錄假期：${dates}`;
-    await replyToLine(replyToken, msg);
+    const baseText = result === 'updated'
+  ? `✅ @${name} 的假期已更新為：${dates}`
+  : `✅ 已為 @${name} 記錄假期：${dates}`;
+
+const mentionees = [{
+  index: 2, // @ 前的文字長度
+  length: name.length + 1,
+  userId
+}];
+
+await replyToLineWithMention(replyToken, baseText, mentionees);
   }
 
   res.send('OK');
