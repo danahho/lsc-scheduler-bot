@@ -22,19 +22,13 @@ app.post('/webhook', async (req, res) => {
     const userId = source.userId;
     const userMessage = message.text.trim();
 
-    // ✅ 幫助功能
+    // 幫助功能
     if (userMessage === '/幫助') {
-      await replyToLine(replyToken, `
-📖 指令說明：
-👉 記錄假期：@LSC排班助理 小明 6/3, 6/7 休假
-👉 查詢當月：/休假 [月份]（例如：/休假 6）
-👉 清除紀錄：/清除 [月份]（例如：/清除 6）
-👉 顯示幫助：/幫助
-      `.trim());
+      await replyToLine(replyToken, `📖 指令說明：\n👉 記錄假期：@LSC排班助理 小明 6/3, 6/7 休假\n👉 查詢當月：/休假 [月份]（例如：/休假 6）\n👉 清除紀錄：/清除 [月份]（例如：/清除 6）\n👉 顯示幫助：/幫助`);
       continue;
     }
 
-    // ✅ 查詢功能（支援指定月份 + mention）
+    // 查詢功能
     if (userMessage.startsWith('/休假')) {
       const parts = userMessage.trim().split(' ');
       let month = (new Date().getMonth() + 1).toString().padStart(2, '0');
@@ -50,27 +44,27 @@ app.post('/webhook', async (req, res) => {
       if (records.length === 0) {
         await replyToLine(replyToken, `📭 ${month} 月沒有任何記錄`);
       } else {
-        let text = '';
-        let mentionees = [];
-        let currentIndex = 0;
+        let text = `📅 ${month} 月排班記錄：\n`;
+        const mentionees = [];
+        let index = text.length;
 
         for (const r of records) {
-          const display = `@${r[2]}：${r[4]}\n`;
-          text += display;
+          const line = `@${r[2]}：${r[4]}\n`;
           mentionees.push({
-            index: currentIndex,
-            length: r[2].length + 1, // 包含 @
+            index,
+            length: r[2].length + 1,
             userId: r[3]
           });
-          currentIndex += display.length;
+          text += line;
+          index += line.length;
         }
 
-        await replyToLineWithMention(replyToken, `📅 ${month} 月排班記錄：\n` + text, mentionees);
+        await replyToLineWithMention(replyToken, text, mentionees);
       }
       continue;
     }
 
-    // ✅ 清除功能
+    // 清除功能
     if (userMessage.startsWith('/清除')) {
       const parts = userMessage.split(' ');
       if (parts.length !== 2 || !/^\d{1,2}$/.test(parts[1])) {
@@ -88,13 +82,13 @@ app.post('/webhook', async (req, res) => {
       continue;
     }
 
-    // ✅ 是否提到 BOT
+    // 是否提到 BOT
     const botMentioned = message.mentioned?.mentions?.some(m => m.userId === BOT_USER_ID)
       || userMessage.includes('@LSC排班助理');
 
     if (!botMentioned) continue;
 
-    // ✅ 假期紀錄語法解析
+    // 假期紀錄語法解析
     const match = userMessage.match(/@?LSC排班助理\s+(.*?)(\d{1,2}\/\d{1,2}(?:,\s*\d{1,2}\/\d{1,2})*)\s*(休假|休)?/);
     if (!match) {
       await replyToLine(replyToken, '❗️請輸入正確格式：@LSC排班助理 小明 6/3, 6/7 休假');
@@ -124,17 +118,15 @@ app.post('/webhook', async (req, res) => {
     const result = await updateVacation(groupId, monthText, name, userId, dates);
     if (result === 'same') return;
 
-    const baseText = result === 'updated'
+    const msgText = result === 'updated'
       ? `✅ @${name} 的假期已更新為：${dates}`
       : `✅ 已為 @${name} 記錄假期：${dates}`;
 
-    const mentionees = [{
-      index: 2, // from "✅ @"
+    await replyToLineWithMention(replyToken, msgText, [{
+      index: msgText.indexOf(`@${name}`),
       length: name.length + 1,
-      userId: userId
-    }];
-
-    await replyToLineWithMention(replyToken, baseText, mentionees);
+      userId
+    }]);
   }
 
   res.send('OK');
