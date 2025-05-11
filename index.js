@@ -1,8 +1,7 @@
-// index.js
 import express from 'express';
 import axios from 'axios';
 import dotenv from 'dotenv';
-import { updateVacation, getVacationByMonth } from './google-sheet.js';
+import { updateVacation, getVacationByMonth, clearVacation } from './google-sheet.js';
 
 dotenv.config();
 
@@ -23,7 +22,7 @@ app.post('/webhook', async (req, res) => {
     const userId = source.userId;
     const userMessage = message.text.trim();
 
-    // 查詢功能
+    // ✅ 查詢功能：/休假
     if (userMessage.startsWith('/休假')) {
       const now = new Date();
       const year = now.getFullYear();
@@ -40,13 +39,31 @@ app.post('/webhook', async (req, res) => {
       continue;
     }
 
-    // 是否提到 BOT
+    // ✅ 清除功能：/清除 6
+    if (userMessage.startsWith('/清除')) {
+      const parts = userMessage.split(' ');
+      if (parts.length !== 2 || !/^\d{1,2}$/.test(parts[1])) {
+        await replyToLine(replyToken, '請輸入正確格式：/清除 6');
+        continue;
+      }
+
+      const year = new Date().getFullYear();
+      const monthText = `${year}-${parts[1].padStart(2, '0')}`;
+      const result = await clearVacation(groupId, monthText, userId);
+      const msg = result
+        ? `🧹 已清除 ${monthText} 的假期紀錄`
+        : `❌ 沒有找到 ${monthText} 的假期紀錄`;
+      await replyToLine(replyToken, msg);
+      continue;
+    }
+
+    // ✅ 是否提到 BOT
     const botMentioned = message.mentioned?.mentions?.some(m => m.userId === BOT_USER_ID)
       || userMessage.includes('@LSC排班助理');
 
     if (!botMentioned) continue;
 
-    // 假期紀錄語法解析
+    // ✅ 假期紀錄語法解析
     const match = userMessage.match(/@?LSC排班助理\s+(.*?)(\d{1,2}\/\d{1,2}(?:,\s*\d{1,2}\/\d{1,2})*)\s*(休假|休)?/);
     if (!match) {
       await replyToLine(replyToken, '❗️請輸入正確格式：@LSC排班助理 小明 6/3, 6/7 休假');
@@ -56,6 +73,7 @@ app.post('/webhook', async (req, res) => {
     let name = match[1].trim();
     const dates = match[2].trim();
 
+    // 如果沒有輸入名字，就用 LINE 顯示名稱
     if (!name || /\d/.test(name)) {
       try {
         const profile = await axios.get(`https://api.line.me/v2/bot/group/${groupId}/member/${userId}`, {
