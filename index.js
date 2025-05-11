@@ -22,8 +22,8 @@ app.post('/webhook', async (req, res) => {
     const userId = source.userId;
     const userMessage = message.text.trim();
 
-    // ✅ 幫助功能// ✅ 幫助功能// ✅ 幫助功能// ✅ 幫助功能
-    if (userMessage === '/幫助') {if (userMessage === '/幫助') {if (userMessage === '/幫助') {if (userMessage === '/幫助') {
+       // ✅ 幫助功能
+    if (userMessage === '/幫助') {
       await replyToLine(replyToken, `
 📖 指令說明：
 👉 記錄假期：@LSC排班助理 小明 6/3, 6/7 休假
