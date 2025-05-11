@@ -1,81 +1,175 @@
-import { google } from 'googleapis';
+import express from 'express';
+import axios from 'axios';
 import dotenv from 'dotenv';
+import { updateVacation, getVacationByMonth, clearVacation } from './google-sheet.js';
 
 dotenv.config();
 
-const sheetId = process.env.GOOGLE_SHEET_ID;
-const credentials = JSON.parse(process.env.GOOGLE_CREDENTIALS);
+const app = express();
+app.use(express.json());
 
-// 修正私鑰中的換行符號
-credentials.private_key = credentials.private_key.replace(/\\n/g, '\n');
+const CHANNEL_ACCESS_TOKEN = process.env.CHANNEL_ACCESS_TOKEN;
+const BOT_USER_ID = process.env.BOT_USER_ID;
 
-const auth = new google.auth.GoogleAuth({
-  credentials,
-  scopes: ['https://www.googleapis.com/auth/spreadsheets']
-});
+app.post('/webhook', async (req, res) => {
+  const events = req.body.events;
 
-const sheets = google.sheets({ version: 'v4', auth });
+  for (const event of events) {
+    if (event.type !== 'message' || event.message.type !== 'text') continue;
 
-// ✅ 記錄或更新假期
-export async function updateVacation(groupId, month, displayName, userId, vacationText) {
-  const range = '工作表1!A2:E';
-  const res = await sheets.spreadsheets.values.get({ spreadsheetId: sheetId, range });
-  const rows = res.data.values || [];
-  const lowerMonth = month.trim();
-  const matchedIndex = rows.findIndex(row => row[0] === groupId && row[1] === lowerMonth && row[3] === userId);
+    const { source, message, replyToken } = event;
+    const groupId = source.groupId || source.roomId || source.userId;
+    const userId = source.userId;
+    const userMessage = message.text.trim();
 
-  if (matchedIndex !== -1) {
-    const current = rows[matchedIndex][4] || '';
-    if (current === vacationText) return 'same';
+    // ✅ 幫助功能
+    if (userMessage === '/幫助') {
+      await replyToLine(replyToken, `
+📖 指令說明：
+👉 記錄假期：@LSC排班助理 小明 6/3, 6/7 休假
+👉 查詢當月：/休假 [月份]（例如：/休假 6）
+👉 清除紀錄：/清除 [月份]（例如：/清除 6）
+👉 顯示幫助：/幫助
+      `.trim());
+      continue;
+    }
 
-    const updateRange = `工作表1!E${matchedIndex + 2}`;
-    await sheets.spreadsheets.values.update({
-      spreadsheetId: sheetId,
-      range: updateRange,
-      valueInputOption: 'RAW',
-      requestBody: { values: [[vacationText]] }
-    });
-    return 'updated';
+    // ✅ 查詢功能（支援指定月份 + mention）
+    if (userMessage.startsWith('/休假')) {
+      const parts = userMessage.trim().split(' ');
+      let month = (new Date().getMonth() + 1).toString().padStart(2, '0');
+
+      if (parts.length === 2 && /^\d{1,2}$/.test(parts[1])) {
+        month = parts[1].padStart(2, '0');
+      }
+
+      const year = new Date().getFullYear();
+      const monthText = `${year}-${month}`;
+      const records = await getVacationByMonth(groupId, monthText);
+
+      if (records.length === 0) {
+        await replyToLine(replyToken, `📭 ${month} 月沒有任何記錄`);
+      } else {
+        let text = '';
+        let mentionees = [];
+        let currentIndex = 0;
+
+        for (const r of records) {
+          const display = `@${r[2]}：${r[4]}\n`;
+          text += display;
+          mentionees.push({
+            index: currentIndex,
+            length: r[2].length + 1, // 包含 @
+            userId: r[3]
+          });
+          currentIndex += display.length;
+        }
+
+        await replyToLineWithMention(replyToken, `📅 ${month} 月排班記錄：\n` + text, mentionees);
+      }
+      continue;
+    }
+
+    // ✅ 清除功能
+    if (userMessage.startsWith('/清除')) {
+      const parts = userMessage.split(' ');
+      if (parts.length !== 2 || !/^\d{1,2}$/.test(parts[1])) {
+        await replyToLine(replyToken, '請輸入正確格式：/清除 6');
+        continue;
+      }
+
+      const year = new Date().getFullYear();
+      const monthText = `${year}-${parts[1].padStart(2, '0')}`;
+      const result = await clearVacation(groupId, monthText, userId);
+      const msg = result
+        ? `🧹 已清除 ${monthText} 的假期紀錄`
+        : `❌ 沒有找到 ${monthText} 的假期紀錄`;
+      await replyToLine(replyToken, msg);
+      continue;
+    }
+
+    // ✅ 是否提到 BOT
+    const botMentioned = message.mentioned?.mentions?.some(m => m.userId === BOT_USER_ID)
+      || userMessage.includes('@LSC排班助理');
+
+    if (!botMentioned) continue;
+
+    // ✅ 假期紀錄語法解析
+    const match = userMessage.match(/@?LSC排班助理\s+(.*?)(\d{1,2}\/\d{1,2}(?:,\s*\d{1,2}\/\d{1,2})*)\s*(休假|休)?/);
+    if (!match) {
+      await replyToLine(replyToken, '❗️請輸入正確格式：@LSC排班助理 小明 6/3, 6/7 休假');
+      continue;
+    }
+
+    let name = match[1].trim();
+    const dates = match[2].trim();
+
+    if (!name || /\d/.test(name)) {
+      try {
+        const profile = await axios.get(`https://api.line.me/v2/bot/group/${groupId}/member/${userId}`, {
+          headers: { Authorization: `Bearer ${CHANNEL_ACCESS_TOKEN}` }
+        });
+        name = profile.data.displayName;
+      } catch {
+        name = '未知使用者';
+      }
+    }
+
+    const now = new Date();
+    const firstDate = dates.split(',')[0].trim();
+    const [month] = firstDate.split('/');
+    const year = now.getFullYear();
+    const monthText = `${year}-${month.padStart(2, '0')}`;
+
+    const result = await updateVacation(groupId, monthText, name, userId, dates);
+    if (result === 'same') return;
+
+    const msg = result === 'updated'
+      ? `✅ @${name} 的假期已更新為：${dates}`
+      : `✅ 已為 @${name} 記錄假期：${dates}`;
+    await replyToLine(replyToken, msg);
   }
 
-  await sheets.spreadsheets.values.append({
-    spreadsheetId: sheetId,
-    range: '工作表1!A:E',
-    valueInputOption: 'RAW',
-    requestBody: {
-      values: [[groupId, lowerMonth, displayName, userId, vacationText]]
-    }
-  });
+  res.send('OK');
+});
 
-  return 'new';
+async function replyToLine(replyToken, message) {
+  try {
+    await axios.post('https://api.line.me/v2/bot/message/reply', {
+      replyToken,
+      messages: [{ type: 'text', text: message }]
+    }, {
+      headers: {
+        'Authorization': `Bearer ${CHANNEL_ACCESS_TOKEN}`,
+        'Content-Type': 'application/json'
+      }
+    });
+  } catch (error) {
+    console.error('LINE 回覆錯誤：', error?.response?.data || error.message);
+  }
 }
 
-// ✅ 查詢指定群組與月份的所有假期紀錄
-export async function getVacationByMonth(groupId, month) {
-  const range = '工作表1!A2:E';
-  const res = await sheets.spreadsheets.values.get({ spreadsheetId: sheetId, range });
-  const rows = res.data.values || [];
-  const lowerMonth = month.trim();
-  return rows.filter(row => row[0] === groupId && row[1] === lowerMonth && row[4]);
+async function replyToLineWithMention(replyToken, messageText, mentionees) {
+  try {
+    await axios.post('https://api.line.me/v2/bot/message/reply', {
+      replyToken,
+      messages: [{
+        type: 'text',
+        text: messageText,
+        mention: { mentionees }
+      }]
+    }, {
+      headers: {
+        'Authorization': `Bearer ${CHANNEL_ACCESS_TOKEN}`,
+        'Content-Type': 'application/json'
+      }
+    });
+  } catch (error) {
+    console.error('LINE mention 回覆錯誤：', error?.response?.data || error.message);
+  }
 }
 
-// ✅ 清除使用者該月假期（清空 E 欄）
-export async function clearVacation(groupId, month, userId) {
-  const range = '工作表1!A2:E';
-  const res = await sheets.spreadsheets.values.get({ spreadsheetId: sheetId, range });
-  const rows = res.data.values || [];
-  const lowerMonth = month.trim();
-  const matchedIndex = rows.findIndex(row => row[0] === groupId && row[1] === lowerMonth && row[3] === userId);
-
-  if (matchedIndex === -1) return false;
-
-  const clearRange = `工作表1!E${matchedIndex + 2}`;
-  await sheets.spreadsheets.values.update({
-    spreadsheetId: sheetId,
-    range: clearRange,
-    valueInputOption: 'RAW',
-    requestBody: { values: [['']] }
-  });
-
-  return true;
-}
+const PORT = process.env.PORT || 8080;
+app.listen(PORT, () => {
+  console.log(`🚀 LSC排班助理運行中，http://localhost:${PORT}`);
+});
