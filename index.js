@@ -22,8 +22,8 @@ app.post('/webhook', async (req, res) => {
     const userId = source.userId;
     const userMessage = message.text.trim();
 
-       // ✅ 幫助功能// ✅ 幫助功能// ✅ 幫助功能// ✅ 幫助功能
-    if (userMessage === '/幫助') {if (userMessage === '/幫助') {if (userMessage === '/幫助') {if (userMessage === '/幫助') {
+    // ✅ 幫助功能
+    if (userMessage === '/幫助') {
       await replyToLine(replyToken, `
 📖 指令說明：
 👉 記錄假期：@LSC排班助理 小明 6/3, 6/7 休假
@@ -35,27 +35,27 @@ app.post('/webhook', async (req, res) => {
     }
 
     // ✅ 查詢功能（支援指定月份）
-if (userMessage.startsWith('/休假')) {
-  const parts = userMessage.trim().split(' ');
-  let month = (new Date().getMonth() + 1).toString().padStart(2, '0');
+    if (userMessage.startsWith('/休假')) {
+      const parts = userMessage.trim().split(' ');
+      let month = (new Date().getMonth() + 1).toString().padStart(2, '0');
 
-  // 如果輸入了月份參數
-  if (parts.length === 2 && /^\d{1,2}$/.test(parts[1])) {
-    month = parts[1].padStart(2, '0');
-  }
+      if (parts.length === 2 && /^\d{1,2}$/.test(parts[1])) {
+        month = parts[1].padStart(2, '0');
+      }
 
-  const year = new Date().getFullYear();
-  const monthText = `${year}-${month}`;
+      const year = new Date().getFullYear();
+      const monthText = `${year}-${month}`;
 
-  const records = await getVacationByMonth(groupId, monthText);
-  if (records.length === 0) {
-    await replyToLine(replyToken, `📭 ${month} 月沒有任何記錄`);
-  } else {
-    const lines = records.map(r => `📌 ${r[2]}：${r[4]}`);
-    await replyToLine(replyToken, `📅 ${month} 月排班記錄：\n` + lines.join('\n'));
-  }
-  continue;
-}
+      const records = await getVacationByMonth(groupId, monthText);
+      if (records.length === 0) {
+        await replyToLine(replyToken, `📭 ${month} 月沒有任何記錄`);
+      } else {
+        const lines = records.map(r => `📌 ${r[2]}：${r[4]}`);
+        await replyToLine(replyToken, `📅 ${month} 月排班記錄：\n` + lines.join('\n'));
+      }
+      continue;
+    }
+
     // ✅ 清除功能
     if (userMessage.startsWith('/清除')) {
       const parts = userMessage.split(' ');
@@ -90,7 +90,6 @@ if (userMessage.startsWith('/休假')) {
     let name = match[1].trim();
     const dates = match[2].trim();
 
-    // 如果沒有輸入名字，就用 LINE 顯示名稱
     if (!name || /\d/.test(name)) {
       try {
         const profile = await axios.get(`https://api.line.me/v2/bot/group/${groupId}/member/${userId}`, {
@@ -132,7 +131,7 @@ async function replyToLine(replyToken, message) {
       }
     });
   } catch (error) {
-    console.error('LINE 回覆錯誤：', error);
+    console.error('LINE 回覆錯誤：', error?.response?.data || error.message);
   }
 }
 
