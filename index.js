@@ -1,9 +1,8 @@
 // index.js
 import express from 'express';
 import axios from 'axios';
-import { GoogleGenerativeAI } from "@google/generative-ai";
-import { updateVacation } from './google-sheet.js';
 import dotenv from 'dotenv';
+import { updateVacation, getVacationByMonth } from './google-sheet.js';
 
 dotenv.config();
 
@@ -11,64 +10,76 @@ const app = express();
 app.use(express.json());
 
 const CHANNEL_ACCESS_TOKEN = process.env.CHANNEL_ACCESS_TOKEN;
-const BOT_USER_ID = process.env.BOT_USER_ID; // 可選
+const BOT_USER_ID = process.env.BOT_USER_ID;
 
 app.post('/webhook', async (req, res) => {
   const events = req.body.events;
 
   for (const event of events) {
-    if (event.type === 'message' && event.message.type === 'text') {
-      const { source, message, replyToken } = event;
-      const groupId = source.groupId || source.roomId || source.userId;
-      const userId = source.userId;
-      const userMessage = message.text.trim();
+    if (event.type !== 'message' || event.message.type !== 'text') continue;
 
-      // 檢查是否提到 BOT
-      const botMentioned = message.mentioned?.mentions?.some(m => m.userId === BOT_USER_ID)
-        || userMessage.includes('@LSC排班助理');
+    const { source, message, replyToken } = event;
+    const groupId = source.groupId || source.roomId || source.userId;
+    const userId = source.userId;
+    const userMessage = message.text.trim();
 
-      if (!botMentioned) continue;
-
-      // 擷取假期資料
-      const match = userMessage.match(/@?LSC排班助理\s+(.*?)(\d{1,2}\/\d{1,2}(?:,\s*\d{1,2}\/\d{1,2})*)\s*(休假|休)?/);
-      if (!match) {
-        await replyToLine(replyToken, '請輸入正確格式，例如：@LSC排班助理 6/3, 6/7 休假');
-        continue;
-      }
-
-      let name = match[1].trim();
-      const dates = match[2].trim();
-
-      // 若未指定名字，用 LINE displayName 查詢
-      if (!name || /\d/.test(name)) {
-        try {
-          const profile = await axios.get(`https://api.line.me/v2/bot/group/${groupId}/member/${userId}`, {
-            headers: { Authorization: `Bearer ${CHANNEL_ACCESS_TOKEN}` }
-          });
-          name = profile.data.displayName;
-        } catch {
-          name = '未知使用者';
-        }
-      }
-
-      // 計算月份 yyyy-mm
+    // 查詢功能
+    if (userMessage.startsWith('/休假')) {
       const now = new Date();
-      const firstDate = dates.split(',')[0].trim();
-      const [month] = firstDate.split('/');
       const year = now.getFullYear();
-      const monthText = `${year}-${month.padStart(2, '0')}`;
+      const month = (now.getMonth() + 1).toString().padStart(2, '0');
+      const monthText = `${year}-${month}`;
 
-      // 寫入 Google Sheet
-      const result = await updateVacation(groupId, monthText, name, userId, dates);
-
-      if (result === 'same') return;
-
-      const msg = result === 'updated'
-        ? `✅ @${name} 的假期已更新為：${dates}`
-        : `✅ 已為 @${name} 記錄假期：${dates}`;
-
-      await replyToLine(replyToken, msg);
+      const records = await getVacationByMonth(groupId, monthText);
+      if (records.length === 0) {
+        await replyToLine(replyToken, `📭 ${month} 月沒有任何記錄`);
+      } else {
+        const lines = records.map(r => `📌 ${r[2]}：${r[4]}`);
+        await replyToLine(replyToken, `📅 ${month} 月排班記錄：\n` + lines.join('\n'));
+      }
+      continue;
     }
+
+    // 是否提到 BOT
+    const botMentioned = message.mentioned?.mentions?.some(m => m.userId === BOT_USER_ID)
+      || userMessage.includes('@LSC排班助理');
+
+    if (!botMentioned) continue;
+
+    // 假期紀錄語法解析
+    const match = userMessage.match(/@?LSC排班助理\s+(.*?)(\d{1,2}\/\d{1,2}(?:,\s*\d{1,2}\/\d{1,2})*)\s*(休假|休)?/);
+    if (!match) {
+      await replyToLine(replyToken, '❗️請輸入正確格式：@LSC排班助理 小明 6/3, 6/7 休假');
+      continue;
+    }
+
+    let name = match[1].trim();
+    const dates = match[2].trim();
+
+    if (!name || /\d/.test(name)) {
+      try {
+        const profile = await axios.get(`https://api.line.me/v2/bot/group/${groupId}/member/${userId}`, {
+          headers: { Authorization: `Bearer ${CHANNEL_ACCESS_TOKEN}` }
+        });
+        name = profile.data.displayName;
+      } catch {
+        name = '未知使用者';
+      }
+    }
+
+    const now = new Date();
+    const firstDate = dates.split(',')[0].trim();
+    const [month] = firstDate.split('/');
+    const year = now.getFullYear();
+    const monthText = `${year}-${month.padStart(2, '0')}`;
+
+    const result = await updateVacation(groupId, monthText, name, userId, dates);
+    if (result === 'same') return;
+
+    const msg = result === 'updated'
+      ? `✅ @${name} 的假期已更新為：${dates}`
+      : `✅ 已為 @${name} 記錄假期：${dates}`;
+    await replyToLine(replyToken, msg);
   }
 
   res.send('OK');
