@@ -22,7 +22,19 @@ app.post('/webhook', async (req, res) => {
     const userId = source.userId;
     const userMessage = message.text.trim();
 
-    // ✅ 查詢功能：/休假
+    // ✅ 幫助功能
+    if (userMessage === '/幫助') {
+      await replyToLine(replyToken, `
+📖 指令說明：
+👉 記錄假期：@LSC排班助理 小明 6/3, 6/7 休假
+👉 查詢當月：/休假
+👉 清除紀錄：/清除 6
+👉 顯示幫助：/幫助
+      `.trim());
+      continue;
+    }
+
+    // ✅ 查詢功能
     if (userMessage.startsWith('/休假')) {
       const now = new Date();
       const year = now.getFullYear();
@@ -39,7 +51,7 @@ app.post('/webhook', async (req, res) => {
       continue;
     }
 
-    // ✅ 清除功能：/清除 6
+    // ✅ 清除功能
     if (userMessage.startsWith('/清除')) {
       const parts = userMessage.split(' ');
       if (parts.length !== 2 || !/^\d{1,2}$/.test(parts[1])) {
