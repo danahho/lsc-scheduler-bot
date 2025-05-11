@@ -34,7 +34,7 @@ app.post('/webhook', async (req, res) => {
       continue;
     }
 
-    // ✅ 查詢功能（支援指定月份）
+    // ✅ 查詢功能（支援指定月份 + mention）
     if (userMessage.startsWith('/休假')) {
       const parts = userMessage.trim().split(' ');
       let month = (new Date().getMonth() + 1).toString().padStart(2, '0');
@@ -45,13 +45,27 @@ app.post('/webhook', async (req, res) => {
 
       const year = new Date().getFullYear();
       const monthText = `${year}-${month}`;
-
       const records = await getVacationByMonth(groupId, monthText);
+
       if (records.length === 0) {
         await replyToLine(replyToken, `📭 ${month} 月沒有任何記錄`);
       } else {
-        const lines = records.map(r => `📌 ${r[2]}：${r[4]}`);
-        await replyToLine(replyToken, `📅 ${month} 月排班記錄：\n` + lines.join('\n'));
+        let text = '';
+        let mentionees = [];
+        let currentIndex = 0;
+
+        for (const r of records) {
+          const display = `@${r[2]}：${r[4]}\n`;
+          text += display;
+          mentionees.push({
+            index: currentIndex,
+            length: r[2].length + 1, // 包含 @
+            userId: r[3]
+          });
+          currentIndex += display.length;
+        }
+
+        await replyToLineWithMention(replyToken, `📅 ${month} 月排班記錄：\n` + text, mentionees);
       }
       continue;
     }
@@ -132,6 +146,26 @@ async function replyToLine(replyToken, message) {
     });
   } catch (error) {
     console.error('LINE 回覆錯誤：', error?.response?.data || error.message);
+  }
+}
+
+async function replyToLineWithMention(replyToken, messageText, mentionees) {
+  try {
+    await axios.post('https://api.line.me/v2/bot/message/reply', {
+      replyToken,
+      messages: [{
+        type: 'text',
+        text: messageText,
+        mention: { mentionees }
+      }]
+    }, {
+      headers: {
+        'Authorization': `Bearer ${CHANNEL_ACCESS_TOKEN}`,
+        'Content-Type': 'application/json'
+      }
+    });
+  } catch (error) {
+    console.error('LINE mention 回覆錯誤：', error?.response?.data || error.message);
   }
 }
 
