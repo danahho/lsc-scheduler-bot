@@ -1,4 +1,3 @@
-// google-sheet.js
 import { google } from 'googleapis';
 import dotenv from 'dotenv';
 
@@ -6,7 +5,6 @@ dotenv.config();
 
 const sheetId = process.env.GOOGLE_SHEET_ID;
 const credentials = JSON.parse(process.env.GOOGLE_CREDENTIALS);
-credentials.private_key = credentials.private_key.replace(/\\n/g, '\n');
 
 const auth = new google.auth.GoogleAuth({
   credentials,
@@ -17,11 +15,7 @@ const sheets = google.sheets({ version: 'v4', auth });
 
 export async function updateVacation(groupId, month, displayName, userId, vacationText) {
   const range = '工作表1!A2:E';
-  const res = await sheets.spreadsheets.values.get({
-    spreadsheetId: sheetId,
-    range
-  });
-
+  const res = await sheets.spreadsheets.values.get({ spreadsheetId: sheetId, range });
   const rows = res.data.values || [];
   const lowerMonth = month.trim();
   const matchedIndex = rows.findIndex(row => row[0] === groupId && row[1] === lowerMonth && row[3] === userId);
@@ -50,39 +44,28 @@ export async function updateVacation(groupId, month, displayName, userId, vacati
       values: [[groupId, lowerMonth, displayName, userId, vacationText]]
     }
   });
-  return 'new';
-}
 
-export async function getVacationByMonth(groupId, month) {
-  const range = '工作表1!A2:E';
-  const res = await sheets.spreadsheets.values.get({
-    spreadsheetId: sheetId,
-    range
-  });
-  const rows = res.data.values || [];
-  return rows.filter(row => row[0] === groupId && row[1] === month);
+  return 'new';
 }
 
 export async function clearVacation(groupId, month, userId) {
   const range = '工作表1!A2:E';
-  const res = await sheets.spreadsheets.values.get({
-    spreadsheetId: sheetId,
-    range
-  });
-
+  const res = await sheets.spreadsheets.values.get({ spreadsheetId: sheetId, range });
   const rows = res.data.values || [];
-  const matchedIndex = rows.findIndex(row => row[0] === groupId && row[1] === month && row[3] === userId);
+  const lowerMonth = month.trim();
+  const matchedIndex = rows.findIndex(row => row[0] === groupId && row[1] === lowerMonth && row[3] === userId);
 
   if (matchedIndex === -1) return false;
 
-  const clearRange = `工作表1!A${matchedIndex + 2}:E${matchedIndex + 2}`;
+  const clearRange = `工作表1!E${matchedIndex + 2}`;
   await sheets.spreadsheets.values.update({
     spreadsheetId: sheetId,
     range: clearRange,
     valueInputOption: 'RAW',
     requestBody: {
-      values: [['', '', '', '', '']]
+      values: [['']]
     }
   });
+
   return true;
 }
