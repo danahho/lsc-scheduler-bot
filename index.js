@@ -22,8 +22,8 @@ app.post('/webhook', async (req, res) => {
     const userId = source.userId;
     const userMessage = message.text.trim();
 
-    // ✅ 幫助功能// ✅ 幫助功能// ✅ 幫助功能// ✅ 幫助功能
-    if (userMessage === '/幫助') {if (userMessage === '/幫助') {
+    // ✅ 幫助功能
+    if (userMessage === '/幫助') {
       await replyToLine(replyToken, `
 📖 指令說明：
 👉 記錄假期：@LSC排班助理 6/3, 6/7
@@ -52,20 +52,18 @@ app.post('/webhook', async (req, res) => {
       } else {
         let text = '';
         let mentionees = [];
-        let text = '';
-        let mentionees = [];
 
         for (const r of records) {
-        const nameTag = `@${r[2]}`;
-        const line = `${nameTag}：${r[4]}\n`;
-        const atIndex = text.length;
+          const nameTag = `@${r[2]}`;
+          const line = `${nameTag}：${r[4]}\n`;
+          const atIndex = text.length;
 
-        text += line;
-        mentionees.push({
-        index: atIndex,
-        length: nameTag.length,
-        userId: r[3]
-        });
+          text += line;
+          mentionees.push({
+            index: atIndex,
+            length: nameTag.length,
+            userId: r[3]
+          });
         }
 
         await replyToLineWithMention(replyToken, `📅 ${month} 月排班記錄：\n` + text, mentionees);
@@ -97,16 +95,17 @@ app.post('/webhook', async (req, res) => {
 
     if (!botMentioned) continue;
 
-    // ✅ 假期紀錄語法解析（去除『休假』兩字）
+    // ✅ 假期紀錄語法解析（不含「休假」兩字）
     const match = userMessage.match(/@?LSC排班助理\s+(.*?)(\d{1,2}\/\d{1,2}(?:,\s*\d{1,2}\/\d{1,2})*)/);
     if (!match) {
-      await replyToLine(replyToken, '❗️請輸入正確格式：@LSC排班助理（標記）6/3, 6/7');
+      await replyToLine(replyToken, '❗️請輸入正確格式：@LSC排班助理 6/3, 6/7');
       continue;
     }
 
     let name = match[1].trim();
     const dates = match[2].trim();
 
+    // 如果沒有輸入名字，就用 LINE 顯示名稱
     if (!name || /\d/.test(name)) {
       try {
         const profile = await axios.get(`https://api.line.me/v2/bot/group/${groupId}/member/${userId}`, {
@@ -127,17 +126,17 @@ app.post('/webhook', async (req, res) => {
     const result = await updateVacation(groupId, monthText, name, userId, dates);
     if (result === 'same') return;
 
-   const prefix = result === 'updated'
-  ? `✅ @${name} 的假期已更新為：${dates}`
-  : `✅ 已為 @${name} 記錄假期：${dates}`;
+    const msgText = result === 'updated'
+      ? `✅ @${name} 的假期已更新為：${dates}`
+      : `✅ 已為 @${name} 記錄假期：${dates}`;
 
-   const mentionIndex = prefix.indexOf(`@${name}`);
+    const mentionIndex = msgText.indexOf(`@${name}`);
 
-   await replyToLineWithMention(replyToken, prefix, [{
-   index: mentionIndex,
-   length: name.length + 1,
-   userId
-}]);
+    await replyToLineWithMention(replyToken, msgText, [{
+      index: mentionIndex,
+      length: name.length + 1,
+      userId
+    }]);
   }
 
   res.send('OK');
