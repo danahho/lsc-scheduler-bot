@@ -22,8 +22,8 @@ app.post('/webhook', async (req, res) => {
     const userId = source.userId;
     const userMessage = message.text.trim();
 
-    // ✅ 幫助功能// ✅ 幫助功能
-    if (userMessage === '/幫助') {
+    // ✅ 幫助功能// ✅ 幫助功能// ✅ 幫助功能// ✅ 幫助功能
+    if (userMessage === '/幫助') {if (userMessage === '/幫助') {
       await replyToLine(replyToken, `
 📖 指令說明：
 👉 記錄假期：@LSC排班助理 6/3, 6/7
@@ -52,17 +52,20 @@ app.post('/webhook', async (req, res) => {
       } else {
         let text = '';
         let mentionees = [];
-        let currentIndex = 0;
+        let text = '';
+        let mentionees = [];
 
         for (const r of records) {
-          const display = `@${r[2]}：${r[4]}\n`;
-          text += display;
-          mentionees.push({
-            index: currentIndex,
-            length: r[2].length + 1,
-            userId: r[3]
-          });
-          currentIndex += display.length;
+        const nameTag = `@${r[2]}`;
+        const line = `${nameTag}：${r[4]}\n`;
+        const atIndex = text.length;
+
+        text += line;
+        mentionees.push({
+        index: atIndex,
+        length: nameTag.length,
+        userId: r[3]
+        });
         }
 
         await replyToLineWithMention(replyToken, `📅 ${month} 月排班記錄：\n` + text, mentionees);
@@ -124,15 +127,17 @@ app.post('/webhook', async (req, res) => {
     const result = await updateVacation(groupId, monthText, name, userId, dates);
     if (result === 'same') return;
 
-    const msgText = result === 'updated'
-      ? `✅ @${name} 的假期已更新為：${dates}`
-      : `✅ 已為 @${name} 記錄假期：${dates}`;
+   const prefix = result === 'updated'
+  ? `✅ @${name} 的假期已更新為：${dates}`
+  : `✅ 已為 @${name} 記錄假期：${dates}`;
 
-    await replyToLineWithMention(replyToken, msgText, [{
-      index: 2,
-      length: name.length + 1,
-      userId
-    }]);
+   const mentionIndex = prefix.indexOf(`@${name}`);
+
+   await replyToLineWithMention(replyToken, prefix, [{
+   index: mentionIndex,
+   length: name.length + 1,
+   userId
+}]);
   }
 
   res.send('OK');
