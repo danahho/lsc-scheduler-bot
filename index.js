@@ -21,19 +21,32 @@ app.post('/webhook', async (req, res) => {
     const groupId = source.groupId || source.roomId || source.userId;
     const userId = source.userId;
     const userMessage = message.text.trim();
+
+
     
 // ✅ 臨時測試用指令：/測試mention
 if (userMessage === '/測試mention') {
- const name = '阿和';
-const testText = `@${name} 👋`;
-const mentionIndex = 0;
+  const name = '阿和';
+  const mentionText = `@${name}`;
+  const baseText = `結果\n${mentionText}\n${userId}\nindex = 文字位置\n✅ 正確標記，會通知`;
+  const mentionIndex = baseText.indexOf(mentionText);
 
-await replyToLineWithMention(replyToken, testText, [{
-  index: mentionIndex,
-  length: name.length + 1,
-  userId
-}]);
+  // 印出測試資訊
+  console.log('[測試訊息內容]', baseText);
+  console.log('[mention index]', mentionIndex);
+  console.log('[mention userId]', userId);
 
+  await replyToLineWithMention(replyToken, baseText, [{
+    index: mentionIndex,
+    length: mentionText.length,
+    userId: userId
+  }]);
+
+  continue;
+}
+
+
+    
   return;
 }
     // 幫助功能
