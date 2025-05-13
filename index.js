@@ -10,7 +10,9 @@ app.use(express.json());
 
 const CHANNEL_ACCESS_TOKEN = process.env.CHANNEL_ACCESS_TOKEN;
 const BOT_USER_ID = process.env.BOT_USER_ID;
-constconst ALLOWED_CLEAR_USERS = ['Uc4f66892f5680f9c79fdd1118be440e3'];  // ← 清除指令授權者 userIdALLOWED_CLEAR_USERS = ['Uc4f66892f5680f9c79fdd1118be440e3'];  // ← 清除指令授權者 userId
+
+// ✅ 允許使用 /清除 的 userId
+const ALLOWED_CLEAR_USERS = ['Uc4f66892f5680f9c79fdd1118be440e3'];
 
 app.post('/webhook', async (req, res) => {
   const events = req.body.events;
@@ -22,12 +24,10 @@ app.post('/webhook', async (req, res) => {
     const groupId = source.groupId || source.roomId || source.userId;
     const userId = source.userId;
     const userMessage = message.text.trim();
-
-    // 🔽────────────────────────────
-    // ✅ 臨時測試 mention 指令// ✅ 臨時測試 mention 指令
-    // 🔼────────────────────────────
-   if (userMessage === '/測試mention') {
-  // 透過 LINE API 查詢觸發者的 displayName
+// 🔽────────────────────────────
+// ✅ /測試mention 指令（用於確認標記功能）
+// 🔼────────────────────────────
+  if (userMessage === '/測試mention') {
   let displayName = '使用者';
 
   try {
@@ -48,6 +48,8 @@ app.post('/webhook', async (req, res) => {
     userId
   }]);
 
+  continue;
+}
   continue;
 }
 
