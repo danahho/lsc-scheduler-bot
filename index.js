@@ -22,8 +22,8 @@ app.post('/webhook', async (req, res) => {
     const userId = source.userId;
     const userMessage = message.text.trim();
 
-    // 幫助功能
-    if (userMessage === '/幫助') {
+    // 幫助功能// 幫助功能
+    if (userMessage === '/幫助') {if (userMessage === '/幫助') {
       await replyToLine(replyToken, `
 📖 指令說明：
 👉 記錄假期：@LSC排班助理 6/3, 6/7
@@ -70,23 +70,32 @@ app.post('/webhook', async (req, res) => {
       continue;
     }
 
-    // 清除功能
-    if (userMessage.startsWith('/清除')) {
-      const parts = userMessage.split(' ');
-      if (parts.length !== 2 || !/^\d{1,2}$/.test(parts[1])) {
-        await replyToLine(replyToken, '請輸入正確格式：/清除 6');
-        continue;
-      }
+   // ✅ 允許使用 /清除 指令的 LINE userId 清單
+const ALLOWED_CLEAR_USERS = ['Uc4f66892f5680f9c79fdd1118be440e3'];  // 和
 
-      const year = new Date().getFullYear();
-      const monthText = `${year}-${parts[1].padStart(2, '0')}`;
-      const result = await clearVacation(groupId, monthText, userId);
-      const msg = result
-        ? `🧹 已清除 ${monthText} 的假期紀錄`
-        : `❌ 沒有找到 ${monthText} 的假期紀錄`;
-      await replyToLine(replyToken, msg);
-      continue;
-    }
+// 清除功能
+if (userMessage.startsWith('/清除')) {
+  // 👉 權限檢查
+  if (!ALLOWED_CLEAR_USERS.includes(userId)) {
+    await replyToLine(replyToken, '⛔️ 你沒有權限使用 /清除 功能');
+    continue;
+  }
+
+  const parts = userMessage.split(' ');
+  if (parts.length !== 2 || !/^\d{1,2}$/.test(parts[1])) {
+    await replyToLine(replyToken, '請輸入正確格式：/清除 6');
+    continue;
+  }
+
+  const year = new Date().getFullYear();
+  const monthText = `${year}-${parts[1].padStart(2, '0')}`;
+  const result = await clearVacation(groupId, monthText, userId);
+  const msg = result
+    ? `🧹 已清除 ${monthText} 的假期紀錄`
+    : `❌ 沒有找到 ${monthText} 的假期紀錄`;
+  await replyToLine(replyToken, msg);
+  continue;
+}
 
     // 判斷是否標記到 BOT
     const botMentioned = message.mentioned?.mentions?.some(m => m.userId === BOT_USER_ID)
