@@ -34,9 +34,9 @@ app.post('/webhook', async (req, res) => {
       continue;
     }
 
-    // 查詢功能（含標記）
+    // 查詢功能（支援月份 + mention）
     if (userMessage.startsWith('/休假')) {
-      const parts = userMessage.trim().split(' ');
+      const parts = userMessage.split(' ');
       let month = (new Date().getMonth() + 1).toString().padStart(2, '0');
       if (parts.length === 2 && /^\d{1,2}$/.test(parts[1])) {
         month = parts[1].padStart(2, '0');
@@ -51,12 +51,13 @@ app.post('/webhook', async (req, res) => {
       } else {
         let text = '';
         let mentionees = [];
+
         for (const r of records) {
           const nameTag = `@${r[2]}`;
           const line = `${nameTag}：${r[4]}\n`;
           const atIndex = text.length;
-
           text += line;
+
           mentionees.push({
             index: atIndex,
             length: nameTag.length,
@@ -87,26 +88,26 @@ app.post('/webhook', async (req, res) => {
       continue;
     }
 
-    // 判斷是否標記到機器人
+    // 判斷是否標記到 BOT
     const botMentioned = message.mentioned?.mentions?.some(m => m.userId === BOT_USER_ID)
       || userMessage.includes('@LSC排班助理');
 
     if (!botMentioned) continue;
 
-    // 假期語法解析（不含休假）
+    // 假期語法解析（不含「休假」兩字）
     const match = userMessage.match(/@?LSC排班助理\s+((?:\d{1,2}\/\d{1,2}(?:,\s*)?)*)/);
     if (!match) {
       await replyToLine(replyToken, '❗️請輸入正確格式：@LSC排班助理 6/3, 6/7');
       continue;
     }
 
-    const dates = match[1].replace(/\s+/g, '').trim(); // 去除空格
+    const dates = match[1].replace(/\s+/g, '').trim();
     if (!dates) {
       await replyToLine(replyToken, '請至少輸入一個日期，如：@LSC排班助理 6/3');
       continue;
     }
 
-    // 抓取使用者暱稱
+    // 取得使用者暱稱
     let name = '';
     try {
       const profile = await axios.get(`https://api.line.me/v2/bot/group/${groupId}/member/${userId}`, {
@@ -129,7 +130,10 @@ app.post('/webhook', async (req, res) => {
     const msgText = result === 'updated'
       ? `✅ @${name} 的假期已更新為：${dates}`
       : `✅ 已為 @${name} 記錄假期：${dates}`;
+
     const mentionIndex = msgText.indexOf(`@${name}`);
+    console.log(msgText); // 👈 印出訊息內容
+    console.log('Mention index:', mentionIndex); // 👈 印出 index 位置
 
     await replyToLineWithMention(replyToken, msgText, [{
       index: mentionIndex,
@@ -159,6 +163,7 @@ async function replyToLine(replyToken, message) {
 
 async function replyToLineWithMention(replyToken, messageText, mentionees) {
   try {
+    console.log('[🔍 mentionees]', JSON.stringify(mentionees, null, 2)); // 👈 額外印出 mention 資料
     await axios.post('https://api.line.me/v2/bot/message/reply', {
       replyToken,
       messages: [{
