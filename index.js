@@ -22,7 +22,7 @@ app.post('/webhook', async (req, res) => {
     const userId = source.userId;
     const userMessage = message.text.trim();
 
-    // ✅ 幫助功能
+    // 幫助功能
     if (userMessage === '/幫助') {
       await replyToLine(replyToken, `
 📖 指令說明：
@@ -34,11 +34,10 @@ app.post('/webhook', async (req, res) => {
       continue;
     }
 
-    // ✅ 查詢功能（支援指定月份 + mention）
+    // 查詢功能（含標記）
     if (userMessage.startsWith('/休假')) {
       const parts = userMessage.trim().split(' ');
       let month = (new Date().getMonth() + 1).toString().padStart(2, '0');
-
       if (parts.length === 2 && /^\d{1,2}$/.test(parts[1])) {
         month = parts[1].padStart(2, '0');
       }
@@ -52,7 +51,6 @@ app.post('/webhook', async (req, res) => {
       } else {
         let text = '';
         let mentionees = [];
-
         for (const r of records) {
           const nameTag = `@${r[2]}`;
           const line = `${nameTag}：${r[4]}\n`;
@@ -71,7 +69,7 @@ app.post('/webhook', async (req, res) => {
       continue;
     }
 
-    // ✅ 清除功能
+    // 清除功能
     if (userMessage.startsWith('/清除')) {
       const parts = userMessage.split(' ');
       if (parts.length !== 2 || !/^\d{1,2}$/.test(parts[1])) {
@@ -89,32 +87,34 @@ app.post('/webhook', async (req, res) => {
       continue;
     }
 
-    // ✅ 是否提到 BOT
+    // 判斷是否標記到機器人
     const botMentioned = message.mentioned?.mentions?.some(m => m.userId === BOT_USER_ID)
       || userMessage.includes('@LSC排班助理');
 
     if (!botMentioned) continue;
 
-    // ✅ 假期紀錄語法解析（不含「休假」兩字）
-    const match = userMessage.match(/@?LSC排班助理\s+(.*?)(\d{1,2}\/\d{1,2}(?:,\s*\d{1,2}\/\d{1,2})*)/);
+    // 假期語法解析（不含休假）
+    const match = userMessage.match(/@?LSC排班助理\s+((?:\d{1,2}\/\d{1,2}(?:,\s*)?)*)/);
     if (!match) {
       await replyToLine(replyToken, '❗️請輸入正確格式：@LSC排班助理 6/3, 6/7');
       continue;
     }
 
-    let name = match[1].trim();
-    const dates = match[2].trim();
+    const dates = match[1].replace(/\s+/g, '').trim(); // 去除空格
+    if (!dates) {
+      await replyToLine(replyToken, '請至少輸入一個日期，如：@LSC排班助理 6/3');
+      continue;
+    }
 
-    // 如果沒有輸入名字，就用 LINE 顯示名稱
-    if (!name || /\d/.test(name)) {
-      try {
-        const profile = await axios.get(`https://api.line.me/v2/bot/group/${groupId}/member/${userId}`, {
-          headers: { Authorization: `Bearer ${CHANNEL_ACCESS_TOKEN}` }
-        });
-        name = profile.data.displayName;
-      } catch {
-        name = '未知使用者';
-      }
+    // 抓取使用者暱稱
+    let name = '';
+    try {
+      const profile = await axios.get(`https://api.line.me/v2/bot/group/${groupId}/member/${userId}`, {
+        headers: { Authorization: `Bearer ${CHANNEL_ACCESS_TOKEN}` }
+      });
+      name = profile.data.displayName;
+    } catch {
+      name = '未知使用者';
     }
 
     const now = new Date();
@@ -129,7 +129,6 @@ app.post('/webhook', async (req, res) => {
     const msgText = result === 'updated'
       ? `✅ @${name} 的假期已更新為：${dates}`
       : `✅ 已為 @${name} 記錄假期：${dates}`;
-
     const mentionIndex = msgText.indexOf(`@${name}`);
 
     await replyToLineWithMention(replyToken, msgText, [{
