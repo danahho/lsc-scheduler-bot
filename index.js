@@ -1,4 +1,3 @@
-
 import express from 'express';
 import axios from 'axios';
 import dotenv from 'dotenv';
@@ -11,10 +10,7 @@ app.use(express.json());
 
 const CHANNEL_ACCESS_TOKEN = process.env.CHANNEL_ACCESS_TOKEN;
 const BOT_USER_ID = process.env.BOT_USER_ID;
-
-  // ✅ 允許使用 /清除 指令的 LINE userId 清單
-const ALLOWED_CLEAR_USERS = ['Uc4f66892f5680f9c79fdd1118be440e3'];  // 和
-
+const ALLOWED_CLEAR_USERS = ['Uc4f66892f5680f9c79fdd1118be440e3'];  // ← 清除指令授權者 userId
 
 app.post('/webhook', async (req, res) => {
   const events = req.body.events;
@@ -26,32 +22,40 @@ app.post('/webhook', async (req, res) => {
     const groupId = source.groupId || source.roomId || source.userId;
     const userId = source.userId;
     const userMessage = message.text.trim();
-    
-if (userMessage === '/測試mention') {
-  const name = '阿和';
-  const testText = `這是一個測試：@${name}`;
-  const mentionIndex = testText.indexOf(`@${name}`);
 
-  await replyToLineWithMention(replyToken, testText, [{
-    index: mentionIndex,
-    length: name.length + 1,
-    userId
-  }]);
-  continue;
-}
-    // 幫助功能// 幫助功能// 幫助功能// 幫助功能
-   if (userMessage === '/幫助') {
-  await replyToLine(replyToken, `
+    // 🔽────────────────────────────
+    // ✅ 臨時測試 mention 指令
+    // 🔼────────────────────────────
+    if (userMessage === '/測試mention') {
+      const name = '阿和';
+      const testText = `這是一個測試：@${name}`;
+      const mentionIndex = testText.indexOf(`@${name}`);
+
+      await replyToLineWithMention(replyToken, testText, [{
+        index: mentionIndex,
+        length: name.length + 1,
+        userId
+      }]);
+      continue;
+    }
+
+    // 🔽────────────────────────────
+    // ✅ /幫助 指令
+    // 🔼────────────────────────────
+    if (userMessage === '/幫助') {
+      await replyToLine(replyToken, `
 📖 指令說明：
 👉 記錄假期：@LSC排班助理 6/3, 6/7
 👉 查詢當月：/休假 [月份]（例如：/休假 6）
 👉 清除紀錄：/清除 [月份]（例如：/清除 6）
 👉 顯示幫助：/幫助
-  `.trim());
-  continue;
-}
+      `.trim());
+      continue;
+    }
 
-    // 查詢功能（支援月份 + mention）
+    // 🔽────────────────────────────
+    // ✅ /休假 指令（含月份參數與 mention）
+    // 🔼────────────────────────────
     if (userMessage.startsWith('/休假')) {
       const parts = userMessage.split(' ');
       let month = (new Date().getMonth() + 1).toString().padStart(2, '0');
@@ -87,38 +91,42 @@ if (userMessage === '/測試mention') {
       continue;
     }
 
+    // 🔽────────────────────────────
+    // ✅ /清除 指令（限特定 userId）
+    // 🔼────────────────────────────
+    if (userMessage.startsWith('/清除')) {
+      if (!ALLOWED_CLEAR_USERS.includes(userId)) {
+        await replyToLine(replyToken, '⛔️ 你沒有權限使用 /清除 功能');
+        continue;
+      }
 
-// 清除功能
-if (userMessage.startsWith('/清除')) {
-  // 👉 權限檢查
-  if (!ALLOWED_CLEAR_USERS.includes(userId)) {
-    await replyToLine(replyToken, '⛔️ 你沒有權限使用 /清除 功能');
-    continue;
-  }
+      const parts = userMessage.split(' ');
+      if (parts.length !== 2 || !/^\d{1,2}$/.test(parts[1])) {
+        await replyToLine(replyToken, '請輸入正確格式：/清除 6');
+        continue;
+      }
 
-  const parts = userMessage.split(' ');
-  if (parts.length !== 2 || !/^\d{1,2}$/.test(parts[1])) {
-    await replyToLine(replyToken, '請輸入正確格式：/清除 6');
-    continue;
-  }
+      const year = new Date().getFullYear();
+      const monthText = `${year}-${parts[1].padStart(2, '0')}`;
+      const result = await clearVacation(groupId, monthText, userId);
+      const msg = result
+        ? `🧹 已清除 ${monthText} 的假期紀錄`
+        : `❌ 沒有找到 ${monthText} 的假期紀錄`;
+      await replyToLine(replyToken, msg);
+      continue;
+    }
 
-  const year = new Date().getFullYear();
-  const monthText = `${year}-${parts[1].padStart(2, '0')}`;
-  const result = await clearVacation(groupId, monthText, userId);
-  const msg = result
-    ? `🧹 已清除 ${monthText} 的假期紀錄`
-    : `❌ 沒有找到 ${monthText} 的假期紀錄`;
-  await replyToLine(replyToken, msg);
-  continue;
-}
-
-    // 判斷是否標記到 BOT
+    // 🔽────────────────────────────
+    // ✅ 確認是否提及 BOT
+    // 🔼────────────────────────────
     const botMentioned = message.mentioned?.mentions?.some(m => m.userId === BOT_USER_ID)
       || userMessage.includes('@LSC排班助理');
 
     if (!botMentioned) continue;
 
-    // 假期語法解析（不含「休假」兩字）
+    // 🔽────────────────────────────
+    // ✅ 處理假期紀錄指令
+    // 🔼────────────────────────────
     const match = userMessage.match(/@?LSC排班助理\s+((?:\d{1,2}\/\d{1,2}(?:,\s*)?)*)/);
     if (!match) {
       await replyToLine(replyToken, '❗️請輸入正確格式：@LSC排班助理 6/3, 6/7');
@@ -131,7 +139,7 @@ if (userMessage.startsWith('/清除')) {
       continue;
     }
 
-    // 取得使用者暱稱
+    // 取得使用者名稱
     let name = '';
     try {
       const profile = await axios.get(`https://api.line.me/v2/bot/group/${groupId}/member/${userId}`, {
@@ -142,10 +150,9 @@ if (userMessage.startsWith('/清除')) {
       name = '未知使用者';
     }
 
-    const now = new Date();
     const firstDate = dates.split(',')[0].trim();
     const [month] = firstDate.split('/');
-    const year = now.getFullYear();
+    const year = new Date().getFullYear();
     const monthText = `${year}-${month.padStart(2, '0')}`;
 
     const result = await updateVacation(groupId, monthText, name, userId, dates);
@@ -166,6 +173,9 @@ if (userMessage.startsWith('/清除')) {
   res.send('OK');
 });
 
+// 🔽────────────────────────────
+// ✅ 普通回覆訊息
+// 🔼────────────────────────────
 async function replyToLine(replyToken, message) {
   try {
     await axios.post('https://api.line.me/v2/bot/message/reply', {
@@ -182,6 +192,9 @@ async function replyToLine(replyToken, message) {
   }
 }
 
+// 🔽────────────────────────────
+// ✅ mention 回覆訊息
+// 🔼────────────────────────────
 async function replyToLineWithMention(replyToken, messageText, mentionees) {
   try {
     await axios.post('https://api.line.me/v2/bot/message/reply', {
