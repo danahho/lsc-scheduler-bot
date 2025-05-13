@@ -1,3 +1,4 @@
+
 import express from 'express';
 import axios from 'axios';
 import dotenv from 'dotenv';
@@ -11,6 +12,10 @@ app.use(express.json());
 const CHANNEL_ACCESS_TOKEN = process.env.CHANNEL_ACCESS_TOKEN;
 const BOT_USER_ID = process.env.BOT_USER_ID;
 
+  // ✅ 允許使用 /清除 指令的 LINE userId 清單
+const ALLOWED_CLEAR_USERS = ['Uc4f66892f5680f9c79fdd1118be440e3'];  // 和
+
+
 app.post('/webhook', async (req, res) => {
   const events = req.body.events;
 
@@ -21,18 +26,30 @@ app.post('/webhook', async (req, res) => {
     const groupId = source.groupId || source.roomId || source.userId;
     const userId = source.userId;
     const userMessage = message.text.trim();
+    
+if (userMessage === '/測試mention') {
+  const name = '阿和';
+  const testText = `這是一個測試：@${name}`;
+  const mentionIndex = testText.indexOf(`@${name}`);
 
-    // 幫助功能// 幫助功能
-    if (userMessage === '/幫助') {if (userMessage === '/幫助') {
-      await replyToLine(replyToken, `
+  await replyToLineWithMention(replyToken, testText, [{
+    index: mentionIndex,
+    length: name.length + 1,
+    userId
+  }]);
+  continue;
+}
+    // 幫助功能// 幫助功能// 幫助功能// 幫助功能
+   if (userMessage === '/幫助') {
+  await replyToLine(replyToken, `
 📖 指令說明：
 👉 記錄假期：@LSC排班助理 6/3, 6/7
 👉 查詢當月：/休假 [月份]（例如：/休假 6）
 👉 清除紀錄：/清除 [月份]（例如：/清除 6）
 👉 顯示幫助：/幫助
-      `.trim());
-      continue;
-    }
+  `.trim());
+  continue;
+}
 
     // 查詢功能（支援月份 + mention）
     if (userMessage.startsWith('/休假')) {
@@ -70,8 +87,6 @@ app.post('/webhook', async (req, res) => {
       continue;
     }
 
-   // ✅ 允許使用 /清除 指令的 LINE userId 清單
-const ALLOWED_CLEAR_USERS = ['Uc4f66892f5680f9c79fdd1118be440e3'];  // 和
 
 // 清除功能
 if (userMessage.startsWith('/清除')) {
