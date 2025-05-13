@@ -31,10 +31,15 @@ if (userMessage === '/測試mention') {
   const baseText = `結果\n${mentionText}\n${userId}\nindex = 文字位置\n✅ 正確標記，會通知`;
   const mentionIndex = baseText.indexOf(mentionText);
 
+  // 印出測試資訊
+  console.log('[測試訊息內容]', baseText);
+  console.log('[mention index]', mentionIndex);
+  console.log('[mention userId]', userId);
+
   await replyToLineWithMention(replyToken, baseText, [{
     index: mentionIndex,
     length: mentionText.length,
-    userId
+    userId: userId
   }]);
 
   return;
