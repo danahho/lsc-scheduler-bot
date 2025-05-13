@@ -10,7 +10,7 @@ app.use(express.json());
 
 const CHANNEL_ACCESS_TOKEN = process.env.CHANNEL_ACCESS_TOKEN;
 const BOT_USER_ID = process.env.BOT_USER_ID;
-const ALLOWED_CLEAR_USERS = ['Uc4f66892f5680f9c79fdd1118be440e3'];  // ← 清除指令授權者 userId
+constconst ALLOWED_CLEAR_USERS = ['Uc4f66892f5680f9c79fdd1118be440e3'];  // ← 清除指令授權者 userIdALLOWED_CLEAR_USERS = ['Uc4f66892f5680f9c79fdd1118be440e3'];  // ← 清除指令授權者 userId
 
 app.post('/webhook', async (req, res) => {
   const events = req.body.events;
@@ -24,20 +24,32 @@ app.post('/webhook', async (req, res) => {
     const userMessage = message.text.trim();
 
     // 🔽────────────────────────────
-    // ✅ 臨時測試 mention 指令
+    // ✅ 臨時測試 mention 指令// ✅ 臨時測試 mention 指令
     // 🔼────────────────────────────
-    if (userMessage === '/測試mention') {
-      const name = '阿和';
-      const testText = `這是一個測試：@${name}`;
-      const mentionIndex = testText.indexOf(`@${name}`);
+   if (userMessage === '/測試mention') {
+  // 透過 LINE API 查詢觸發者的 displayName
+  let displayName = '使用者';
 
-      await replyToLineWithMention(replyToken, testText, [{
-        index: mentionIndex,
-        length: name.length + 1,
-        userId
-      }]);
-      continue;
-    }
+  try {
+    const profile = await axios.get(`https://api.line.me/v2/bot/group/${groupId}/member/${userId}`, {
+      headers: { Authorization: `Bearer ${CHANNEL_ACCESS_TOKEN}` }
+    });
+    displayName = profile.data.displayName;
+  } catch (error) {
+    console.log('取得使用者名稱失敗', error);
+  }
+
+  const testText = `這是一個 mention 測試：@${displayName} 👋`;
+  const mentionIndex = testText.indexOf(`@${displayName}`);
+
+  await replyToLineWithMention(replyToken, testText, [{
+    index: mentionIndex,
+    length: displayName.length + 1,
+    userId
+  }]);
+
+  continue;
+}
 
     // 🔽────────────────────────────
     // ✅ /幫助 指令
