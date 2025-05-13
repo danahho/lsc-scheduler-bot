@@ -26,20 +26,14 @@ app.post('/webhook', async (req, res) => {
     
 // ✅ 臨時測試用指令：/測試mention
 if (userMessage === '/測試mention') {
-  const name = '阿和';
-  const mentionText = `@${name}`;
-  const baseText = `結果\n${mentionText}\n${userId}\nindex = 文字位置\n✅ 正確標記，會通知`;
-  const mentionIndex = baseText.indexOf(mentionText);
+  const name = '阿和'; // 顯示名稱（可隨便取）
+  const text = `這是一個 mention 測試：@${userId} 👋`;
+  const mentionIndex = text.indexOf(`@${name}`);
 
-  // 印出測試資訊
-  console.log('[測試訊息內容]', baseText);
-  console.log('[mention index]', mentionIndex);
-  console.log('[mention userId]', userId);
-
-  await replyToLineWithMention(replyToken, baseText, [{
+  await replyToLineWithMention(replyToken, text, [{
     index: mentionIndex,
-    length: mentionText.length,
-    userId: userId
+    length: name.length + 1, // 包含 @ 符號
+    userId: userId // 傳送訊息的那個使用者
   }]);
 
   return;
