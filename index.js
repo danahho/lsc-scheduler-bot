@@ -21,7 +21,21 @@ app.post('/webhook', async (req, res) => {
     const groupId = source.groupId || source.roomId || source.userId;
     const userId = source.userId;
     const userMessage = message.text.trim();
+    
+// ✅ 臨時測試用指令：/測試mention
+if (userMessage === '/測試mention') {
+  const name = '阿和';
+  const testText = `這是一個 mention 測試：@${name} 👋`;
+  const mentionIndex = testText.indexOf(`@${name}`);
 
+  await replyToLineWithMention(replyToken, testText, [{
+    index: mentionIndex,
+    length: name.length + 1,
+    userId
+  }]);
+
+  return;
+}
     // 幫助功能
     if (userMessage === '/幫助') {
       await replyToLine(replyToken, `
