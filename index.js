@@ -21,9 +21,17 @@ app.post('/webhook', async (req, res) => {
     const groupId = source.groupId || source.roomId || source.userId;
     const userId = source.userId;
     const userMessage = message.text.trim();
-
-    // 幫助功能
-    if (userMessage === '/幫助') {
+    
+if (userMessage === '/測試mention') {
+  await replyToLineWithMention(replyToken, '你好 @阿和 👋', [{
+    index: 3,
+    length: 3,
+    userId: userId  // 這裡用觸發者自己的 ID
+  }]);
+  continue;
+}
+    // 幫助功能// 幫助功能
+    if (userMessage === '/幫助') {if (userMessage === '/幫助') {
       await replyToLine(replyToken, `
 📖 指令說明：
 👉 記錄假期：@LSC排班助理 6/3, 6/7
