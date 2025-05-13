@@ -25,14 +25,14 @@ app.post('/webhook', async (req, res) => {
 
     
 // ✅ 臨時測試用指令：/測試mention
-if (userMessage === '/測試mention') {
-  const name = '阿和';
+ifif (userMessage === '/測試mention') {(userMessage === '/測試mention') {
+  const name = '阿和';const name = '阿和';
   const mentionText = `@${name}`;
-  const baseText = `結果\n${mentionText}\n${userId}\nindex = 文字位置\n✅ 正確標記，會通知`;
+  const baseText = `結果\n${mentionText}\n${userId}\nindex = 文字位置\n✅ 正確標記，會通知`;const baseText = `結果\n${mentionText}\n${userId}\nindex = 文字位置\n✅ 正確標記，會通知`;
   const mentionIndex = baseText.indexOf(mentionText);
 
-  // 印出測試資訊
-  console.log('[測試訊息內容]', baseText);
+  // 印出測試資訊// 印出測試資訊
+  console.log('[測試訊息內容]', baseText);console.log('[測試訊息內容]', baseText);
   console.log('[mention index]', mentionIndex);
   console.log('[mention userId]', userId);
 
@@ -41,9 +41,6 @@ if (userMessage === '/測試mention') {
     length: mentionText.length,
     userId: userId
   }]);
-
-  continue;
-}
 
 
     
