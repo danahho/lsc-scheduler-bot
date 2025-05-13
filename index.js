@@ -22,12 +22,6 @@ app.post('/webhook', async (req, res) => {
     const userId = source.userId;
     const userMessage = message.text.trim();
 
-
-
-  return;
-}
-
-    
     // 幫助功能
     if (userMessage === '/幫助') {
       await replyToLine(replyToken, `
@@ -136,10 +130,7 @@ app.post('/webhook', async (req, res) => {
     const msgText = result === 'updated'
       ? `✅ @${name} 的假期已更新為：${dates}`
       : `✅ 已為 @${name} 記錄假期：${dates}`;
-
     const mentionIndex = msgText.indexOf(`@${name}`);
-    console.log(msgText); // 👈 印出訊息內容
-    console.log('Mention index:', mentionIndex); // 👈 印出 index 位置
 
     await replyToLineWithMention(replyToken, msgText, [{
       index: mentionIndex,
@@ -169,7 +160,6 @@ async function replyToLine(replyToken, message) {
 
 async function replyToLineWithMention(replyToken, messageText, mentionees) {
   try {
-    console.log('[🔍 mentionees]', JSON.stringify(mentionees, null, 2)); // 👈 額外印出 mention 資料
     await axios.post('https://api.line.me/v2/bot/message/reply', {
       replyToken,
       messages: [{
