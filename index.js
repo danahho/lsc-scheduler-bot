@@ -23,9 +23,9 @@ app.post('/webhook', async (req, res) => {
     const userId = source.userId;
     const userMessage = message.text.trim();
 
-    // /測試mention// /測試mention
-    if (userMessage === '/測試mention') {if (userMessage === '/測試mention') {
-      let displayName = '使用者';let displayName = '使用者';
+    // /測試mention
+    if (userMessage === '/測試mention') {
+      let displayName = '使用者';
       try {
         const profile = await axios.get(`https://api.line.me/v2/bot/group/${groupId}/member/${userId}`, {
           headers: { Authorization: `Bearer ${CHANNEL_ACCESS_TOKEN}` }
@@ -33,7 +33,7 @@ app.post('/webhook', async (req, res) => {
         displayName = profile.data.displayName;
       } catch {}
 
-      const testText = `這是一個 mention 測試：@${displayName} 👋`;const testText = `這是一個 mention 測試：@${displayName} 👋`;
+      const testText = `這是一個 mention 測試：@${displayName} 👋`;
       const mentionIndex = testText.indexOf(`@${displayName}`);
 
       await replyToLineWithMention(replyToken, testText, [{
@@ -106,25 +106,23 @@ app.post('/webhook', async (req, res) => {
       continue;
     }
 
-    // 確認提到 bot
+    // 假期紀錄處理
     const botMentioned = message.mentioned?.mentions?.some(m => m.userId === BOT_USER_ID)
       || userMessage.includes('@LSC排班助理');
     if (!botMentioned) continue;
 
-    // 假期紀錄處理
-const match = userMessage.match(/@?LSC排班助理\s+((?:\d{1,2}\/\d{1,2}[\s,，]*)+)/);
-if (!match) {
-  await replyToLine(replyToken, '❗️請輸入正確格式：@LSC排班助理 6/3, 6/7');
-  continue;
-}
+    const match = userMessage.match(/@?LSC排班助理\s+((?:\d{1,2}\/\d{1,2}[\s,，]*)+)/);
+    if (!match) {
+      await replyToLine(replyToken, '❗️請輸入正確格式：@LSC排班助理 6/3, 6/7');
+      continue;
+    }
 
-let dates = match[1].trim()
-  .replace(/，/g, ',')
-  .replace(/\s+/g, ',')
-  .replace(/,+/g, ',')
-  .replace(/^,|,$/g, '');
+    let dates = match[1].trim()
+      .replace(/，/g, ',')
+      .replace(/\s+/g, ',')
+      .replace(/,+/g, ',')
+      .replace(/^,|,$/g, '');
 
-    const dates = match[1].replace(/\s+/g, '').trim();
     if (!dates) {
       await replyToLine(replyToken, '請至少輸入一個日期，如：@LSC排班助理 6/3');
       continue;
