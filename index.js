@@ -47,7 +47,7 @@ app.post('/webhook', async (req, res) => {
     // /幫助
     if (userMessage === '/幫助') {
       await replyToLine(replyToken, `📖 指令說明：
-👉 記錄假期：@LSC排班助理 6/3, 6/7
+👉 記錄假期：@LSC排班助理 6/3 6/7
 👉 查詢當月：/休假 [月份]（例如：/休假 6）
 👉 清除紀錄：/清除 [月份]（例如：/清除 6）
 👉 顯示幫助：/幫助`.trim());
