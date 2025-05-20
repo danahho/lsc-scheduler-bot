@@ -10,7 +10,7 @@ app.use(express.json());
 
 const CHANNEL_ACCESS_TOKEN = process.env.CHANNEL_ACCESS_TOKEN;
 const BOT_USER_ID = process.env.BOT_USER_ID;
-const ALLOWED_CLEAR_USERS = ['Uc4f66892f5680f9c79fdd1118be440e3'];
+const ALLOWED_CLEAR_USERS = ['Uc4f66892f5680f9c79fdd1118be440e3']; // 允許使用 /清除 的人
 
 app.post('/webhook', async (req, res) => {
   const events = req.body.events;
@@ -23,7 +23,7 @@ app.post('/webhook', async (req, res) => {
     const userId = source.userId;
     const userMessage = message.text.trim();
 
-    // /測試mention
+    // ✅ 測試 mention
     if (userMessage === '/測試mention') {
       let displayName = '使用者';
       try {
@@ -32,10 +32,8 @@ app.post('/webhook', async (req, res) => {
         });
         displayName = profile.data.displayName;
       } catch {}
-
       const testText = `這是一個 mention 測試：@${displayName} 👋`;
       const mentionIndex = testText.indexOf(`@${displayName}`);
-
       await replyToLineWithMention(replyToken, testText, [{
         index: mentionIndex,
         length: displayName.length + 1,
@@ -44,30 +42,26 @@ app.post('/webhook', async (req, res) => {
       continue;
     }
 
-    // /幫助
+    // ✅ 幫助指令
     if (userMessage === '/幫助') {
       await replyToLine(replyToken, `📖 指令說明：
-👉 記錄假期：@LSC排班助理 6/3 6/7
-👉 查詢當月：/休假 [月份]（例如：/休假 6）
+👉 記錄假期：@LSC排班助理 6/3, 6/7（可用空格、逗號、中文逗號）
+👉 查詢當月：/休假[月份] 或 /休假 [月份]
 👉 清除紀錄：/清除 [月份]（例如：/清除 6）
 👉 顯示幫助：/幫助`.trim());
       continue;
     }
 
-    // /休假
+    // ✅ 查詢當月假期 /休假6 或 /休假 6
     if (userMessage.startsWith('/休假')) {
-      const parts = userMessage.split(' ');
-      let month = (new Date().getMonth() + 1).toString().padStart(2, '0');
-      if (parts.length === 2 && /^\d{1,2}$/.test(parts[1])) {
-        month = parts[1].padStart(2, '0');
-      }
-
+      const month = userMessage.replace('/休假', '').trim() || (new Date().getMonth() + 1).toString();
+      const monthNum = month.padStart(2, '0');
       const year = new Date().getFullYear();
-      const monthText = `${year}-${month}`;
+      const monthText = `${year}-${monthNum}`;
       const records = await getVacationByMonth(groupId, monthText);
 
       if (records.length === 0) {
-        await replyToLine(replyToken, `📭 ${month} 月沒有任何記錄`);
+        await replyToLine(replyToken, `📭 ${parseInt(month)} 月沒有任何記錄`);
       } else {
         let text = '';
         let mentionees = [];
@@ -78,12 +72,12 @@ app.post('/webhook', async (req, res) => {
           text += line;
           mentionees.push({ index: atIndex, length: nameTag.length, userId: r[3] });
         }
-        await replyToLineWithMention(replyToken, `📅 ${month} 月排班記錄：\n` + text, mentionees);
+        await replyToLineWithMention(replyToken, `📅 ${parseInt(month)} 月排班記錄：\n` + text, mentionees);
       }
       continue;
     }
 
-    // /清除
+    // ✅ 清除當月紀錄（需授權 userId）
     if (userMessage.startsWith('/清除')) {
       if (!ALLOWED_CLEAR_USERS.includes(userId)) {
         await replyToLine(replyToken, '⛔️ 你沒有權限使用 /清除 功能');
@@ -106,11 +100,12 @@ app.post('/webhook', async (req, res) => {
       continue;
     }
 
-    // 假期紀錄處理
+    // ✅ 判斷是否提到 bot
     const botMentioned = message.mentioned?.mentions?.some(m => m.userId === BOT_USER_ID)
       || userMessage.includes('@LSC排班助理');
     if (!botMentioned) continue;
 
+    // ✅ 處理假期紀錄指令
     const match = userMessage.match(/@?LSC排班助理\s+((?:\d{1,2}\/\d{1,2}[\s,，]*)+)/);
     if (!match) {
       await replyToLine(replyToken, '❗️請輸入正確格式：@LSC排班助理 6/3, 6/7');
@@ -122,7 +117,6 @@ app.post('/webhook', async (req, res) => {
       .replace(/\s+/g, ',')
       .replace(/,+/g, ',')
       .replace(/^,|,$/g, '');
-
     if (!dates) {
       await replyToLine(replyToken, '請至少輸入一個日期，如：@LSC排班助理 6/3');
       continue;
@@ -161,6 +155,7 @@ app.post('/webhook', async (req, res) => {
   res.send('OK');
 });
 
+// ✅ 一般訊息回覆
 async function replyToLine(replyToken, message) {
   try {
     await axios.post('https://api.line.me/v2/bot/message/reply', {
@@ -177,6 +172,7 @@ async function replyToLine(replyToken, message) {
   }
 }
 
+// ✅ mention 訊息回覆
 async function replyToLineWithMention(replyToken, messageText, mentionees) {
   try {
     await axios.post('https://api.line.me/v2/bot/message/reply', {
